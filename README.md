@@ -1,20 +1,25 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Selihom - Mentally Ill People Support Association | ሰሊሆም
 
-# Run and deploy your AI Studio app
+A full-stack, bi-lingual (English & Amharic) web application for Selihom Mentally Ill People Support Association, featuring impact showcases, volunteer application portals, donation pledges, in-kind supply request tracking, appointment bookings, and an administrative management dashboard.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/2c4a0d4d-1225-4fa7-85bc-d14b93884b7f
+- **Bi-lingual Support**: Complete English and Amharic language toggling across all public and administrative views.
+- **In-Kind Needed Supplies**: Live tracking of urgent supply goals (Food, Medical, Clothing, Hygiene) with priority filters.
+- **Volunteer & Booking Portals**: Streamlined forms for meal scheduling, site visits, and community volunteer signup.
+- **Admin Management Dashboard**: Fully equipped administrative center with modal confirmations for deletion, status filters, and dual-language supply editing.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js (v18+)
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+
+2. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
