@@ -52,7 +52,10 @@ import {
   getInKindNeeds,
   saveInKindNeed,
   deleteInKindNeed,
-  resetInKindNeeds
+  resetInKindNeeds,
+  syncWithServer,
+  exportDataAsJSON,
+  importDatabaseJSON
 } from "../utils/adminStorage";
 import selihomLogo from "../assets/images/selihom_logo.jpg";
 
@@ -66,9 +69,11 @@ interface ConfirmationModalConfig {
   type: "booking" | "pledge" | "volunteer" | "need" | "resetNeeds";
   id: string;
   recordName: string;
-  action: "status_change" | "delete";
+  action: "status_change" | "delete" | "save_need" | "save_profile" | "import_json";
+  payload?: any;
   newStatus?: string;
   statusLabel?: string;
+  title?: string;
   message: string;
 }
 
@@ -151,7 +156,8 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     }
   }, [isOpen]);
 
-  const refreshAllData = () => {
+  const refreshAllData = async () => {
+    await syncWithServer();
     setBookingsList(getBookings());
     setPledgesList(getPledges());
     setVolunteersList(getVolunteers());
@@ -234,9 +240,18 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
       description: { en: descEn, am: descAm },
     };
 
-    const updated = saveInKindNeed(newNeed);
-    setInKindNeeds(updated);
-    setNeedModalOpen(false);
+    setConfirmModal({
+      isOpen: true,
+      type: "need",
+      id: newNeed.id,
+      recordName: newNeed.name.en,
+      action: "save_need",
+      payload: newNeed,
+      title: editingNeedId ? "Confirm Update Supply Need" : "Confirm Add Supply Need",
+      message: editingNeedId
+        ? `Are you sure you want to update supply item "${newNeed.name.en}" (${newNeed.name.am})?`
+        : `Are you sure you want to add new supply item "${newNeed.name.en}" (${newNeed.name.am}) to the public needed items list?`
+    });
   };
 
   const handleDeleteNeed = (id: string, name: string) => {
@@ -247,12 +262,11 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     requestDelete("resetNeeds", "all_needs", "All Needed Supply Items");
   };
 
-  const handleRefreshClick = () => {
+  const handleRefreshClick = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      refreshAllData();
-      setIsRefreshing(false);
-    }, 600);
+    await syncWithServer();
+    await refreshAllData();
+    setIsRefreshing(false);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -312,15 +326,40 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
       passwordHash: newPassword ? newPassword : existingProfile.passwordHash,
     };
 
-    saveAdminProfile(updatedProfile);
-    setProfile(updatedProfile);
-    setCurrentPasswordConfirm("");
-    setNewPassword("");
-    setConfirmNewPassword("");
-    setProfileMessage({ type: "success", text: "Admin profile info and credentials updated successfully!" });
+    setConfirmModal({
+      isOpen: true,
+      type: "booking",
+      id: "admin-profile",
+      recordName: updatedProfile.name,
+      action: "save_profile",
+      payload: updatedProfile,
+      title: "Confirm Admin Profile Update",
+      message: `Are you sure you want to update administrative account details and credentials for "${updatedProfile.username}"?`
+    });
   };
 
-  // Direct status update handler from detail modal pop-up card
+  // Status change request with confirmation modal
+  const requestStatusChange = (
+    type: "booking" | "pledge" | "volunteer",
+    id: string,
+    recordName: string,
+    newStatus: string,
+    statusLabel: string
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      type,
+      id,
+      recordName,
+      action: "status_change",
+      newStatus,
+      statusLabel,
+      title: "Confirm Status Change",
+      message: `Are you sure you want to change the status of ${type} record (${id}) for "${recordName}" to "${statusLabel.toUpperCase()}"?`
+    });
+  };
+
+  // Direct status update executor after confirmation
   const handleDirectStatusChange = (
     type: "booking" | "pledge" | "volunteer",
     id: string,
@@ -369,15 +408,18 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
       id,
       recordName,
       action: "delete",
+      title: "Confirm Deletion",
       message: customMsg
     });
   };
 
-  const executeConfirmAction = () => {
+  const executeConfirmAction = async () => {
     if (!confirmModal) return;
-    const { type, id, action } = confirmModal;
+    const { type, id, action, newStatus, payload } = confirmModal;
 
-    if (action === "delete") {
+    if (action === "status_change" && newStatus) {
+      handleDirectStatusChange(type as any, id, newStatus);
+    } else if (action === "delete") {
       if (type === "booking") {
         setBookingsList(deleteBooking(id));
       } else if (type === "pledge") {
@@ -389,10 +431,29 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
       } else if (type === "resetNeeds") {
         setInKindNeeds(resetInKindNeeds());
       }
+    } else if (action === "save_need" && payload) {
+      const updated = saveInKindNeed(payload);
+      setInKindNeeds(updated);
+      setNeedModalOpen(false);
+    } else if (action === "save_profile" && payload) {
+      saveAdminProfile(payload);
+      setProfile(payload);
+      setCurrentPasswordConfirm("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setProfileMessage({ type: "success", text: "Admin profile info and credentials updated successfully!" });
+    } else if (action === "import_json" && payload) {
+      const success = await importDatabaseJSON(payload);
+      if (success) {
+        await syncWithServer();
+        await refreshAllData();
+        alert("Database JSON imported successfully!");
+      } else {
+        alert("Failed to save JSON to server.");
+      }
     }
 
     setConfirmModal(null);
-    setDetailModal(null);
   };
 
   if (!isOpen) return null;
@@ -940,15 +1001,6 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 {pledgeSubTab === "needs" && (
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={handleResetNeedsToDefault}
-                      className="px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
-                      title="Reset items list to default seed"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-gray-500" />
-                      <span>Reset Defaults</span>
-                    </button>
-
-                    <button
                       onClick={handleOpenCreateNeed}
                       className="px-3.5 py-1.5 bg-brand-green-950 hover:bg-brand-green-900 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                     >
@@ -1390,6 +1442,90 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                   </div>
                 </form>
               </div>
+
+              {/* JSON STORAGE & FILE DATABASE MANAGEMENT (data/db.json) */}
+              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 border border-gray-200 shadow-xs space-y-4 sm:space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-serif text-base sm:text-lg font-extrabold text-brand-green-950 flex items-center gap-2">
+                      <FileText className="w-5 h-5 text-brand-green-800" />
+                      JSON Storage & File Database (`/data/db.json`)
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-1">
+                      All admin data (Bookings, Pledges, Volunteers, Supply Needs) is written directly into <code className="bg-gray-100 px-1.5 py-0.5 rounded text-brand-green-900 font-bold">data/db.json</code> on the server.
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-800 border border-green-200 rounded-full text-[11px] font-bold shrink-0 self-start sm:self-auto">
+                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    Live JSON Server Storage Active
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  {/* Export DB Button */}
+                  <div className="p-4 bg-brand-green-50/60 border border-brand-green-100 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div>
+                      <h5 className="font-bold text-xs text-brand-green-950 uppercase tracking-wider">Export Database JSON</h5>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Download full database snapshot as a JSON file (<code className="font-bold text-brand-green-900">db.json</code>).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetch("/api/db")
+                          .then((res) => res.json())
+                          .then((data) => exportDataAsJSON("db.json", data))
+                          .catch(() => exportDataAsJSON("db.json", { bookings, pledges, volunteers, inKindNeeds, adminProfile: profile }));
+                      }}
+                      className="w-full py-2.5 px-4 bg-brand-green-950 hover:bg-brand-green-900 text-white font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm"
+                    >
+                      <Save className="w-4 h-4 text-brand-yellow-400" />
+                      Download db.json
+                    </button>
+                  </div>
+
+                  {/* Import DB Button */}
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-2xl flex flex-col justify-between space-y-3">
+                    <div>
+                      <h5 className="font-bold text-xs text-gray-900 uppercase tracking-wider">Import & Restore JSON File</h5>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Upload a <code className="font-bold text-gray-900">db.json</code> file to restore or overwrite server database.
+                      </p>
+                    </div>
+                    <label className="w-full py-2.5 px-4 bg-white border border-gray-300 hover:border-brand-green-600 text-gray-900 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 shadow-xs">
+                      <Package className="w-4 h-4 text-brand-green-800" />
+                      <span>Upload & Restore db.json</span>
+                      <input
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const text = await file.text();
+                            const parsed = JSON.parse(text);
+                            setConfirmModal({
+                              isOpen: true,
+                              type: "resetNeeds",
+                              id: "db-json",
+                              recordName: file.name,
+                              action: "import_json",
+                              payload: parsed,
+                              title: "Confirm Database Restore",
+                              message: `Are you sure you want to overwrite and restore the database with the contents of "${file.name}"? This will replace all current bookings, pledges, volunteers, and supply needs data.`
+                            });
+                          } catch (err) {
+                            alert("Invalid JSON file format.");
+                          }
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1408,13 +1544,35 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 bg-red-50 text-red-600 border border-red-100">
-                    <Trash2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
+                  <div
+                    className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+                      confirmModal.action === "delete"
+                        ? "bg-red-50 text-red-600 border-red-100"
+                        : confirmModal.action === "status_change"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-100"
+                        : confirmModal.action === "save_need" || confirmModal.action === "save_profile"
+                        ? "bg-brand-green-50 text-brand-green-800 border-brand-green-100"
+                        : "bg-amber-50 text-amber-700 border-amber-100"
+                    }`}
+                  >
+                    {confirmModal.action === "delete" ? (
+                      <Trash2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
+                    ) : confirmModal.action === "status_change" ? (
+                      <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
+                    ) : confirmModal.action === "save_need" ? (
+                      <Package className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
+                    ) : confirmModal.action === "save_profile" ? (
+                      <Shield className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
+                    ) : (
+                      <FileText className="w-5 h-5 sm:w-6 sm:h-6 stroke-[1.75]" />
+                    )}
                   </div>
                   <div>
-                    <h3 className="font-serif font-bold text-base sm:text-lg text-brand-green-950">Confirm Deletion</h3>
+                    <h3 className="font-serif font-bold text-base sm:text-lg text-brand-green-950">
+                      {confirmModal.title || (confirmModal.action === "delete" ? "Confirm Deletion" : "Confirm Action")}
+                    </h3>
                     <p className="text-xs text-gray-500 font-medium">
-                      Record: <span className="font-bold text-gray-800">{confirmModal.recordName}</span> ({confirmModal.id})
+                      Target: <span className="font-bold text-gray-800">{confirmModal.recordName}</span> ({confirmModal.id})
                     </p>
                   </div>
                 </div>
@@ -1443,9 +1601,26 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 <button
                   type="button"
                   onClick={executeConfirmAction}
-                  className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold rounded-xl text-white shadow-md bg-red-600 hover:bg-red-700 shadow-red-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  className={`w-full sm:w-auto px-5 py-2.5 text-xs font-extrabold rounded-xl text-white shadow-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    confirmModal.action === "delete"
+                      ? "bg-red-600 hover:bg-red-700 shadow-red-600/20"
+                      : confirmModal.action === "status_change"
+                      ? "bg-emerald-700 hover:bg-emerald-800 shadow-emerald-700/20"
+                      : "bg-brand-green-950 hover:bg-brand-green-900 shadow-brand-green-950/20"
+                  }`}
                 >
-                  Delete Record
+                  <Check className="w-4 h-4" />
+                  <span>
+                    {confirmModal.action === "delete"
+                      ? "Confirm Delete"
+                      : confirmModal.action === "status_change"
+                      ? `Update to ${confirmModal.statusLabel || "New Status"}`
+                      : confirmModal.action === "save_need"
+                      ? "Save Supply Item"
+                      : confirmModal.action === "save_profile"
+                      ? "Update Profile"
+                      : "Confirm & Restore DB"}
+                  </span>
                 </button>
               </div>
             </motion.div>
@@ -1713,7 +1888,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 {detailModal.type === "volunteer" && (
                   <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
                     <button
-                      onClick={() => handleDirectStatusChange("volunteer", detailModal.data!.id, "accepted")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "volunteer",
+                          detailModal.data!.id,
+                          (detailModal.data as VolunteerApplication).fullName,
+                          "accepted",
+                          "Accepted"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "accepted"
                           ? "bg-green-700 text-white ring-2 ring-green-400 shadow-md"
@@ -1725,7 +1908,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     </button>
 
                     <button
-                      onClick={() => handleDirectStatusChange("volunteer", detailModal.data!.id, "reviewed")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "volunteer",
+                          detailModal.data!.id,
+                          (detailModal.data as VolunteerApplication).fullName,
+                          "reviewed",
+                          "Under Review"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "reviewed"
                           ? "bg-blue-700 text-white ring-2 ring-blue-400 shadow-md"
@@ -1737,7 +1928,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     </button>
 
                     <button
-                      onClick={() => handleDirectStatusChange("volunteer", detailModal.data!.id, "declined")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "volunteer",
+                          detailModal.data!.id,
+                          (detailModal.data as VolunteerApplication).fullName,
+                          "declined",
+                          "Declined"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "declined"
                           ? "bg-red-700 text-white ring-2 ring-red-400 shadow-md"
@@ -1754,7 +1953,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 {detailModal.type === "booking" && (
                   <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
                     <button
-                      onClick={() => handleDirectStatusChange("booking", detailModal.data!.id, "approved")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "booking",
+                          detailModal.data!.id,
+                          (detailModal.data as Booking).name,
+                          "approved",
+                          "Approved"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "approved"
                           ? "bg-green-700 text-white ring-2 ring-green-400 shadow-md"
@@ -1766,7 +1973,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     </button>
 
                     <button
-                      onClick={() => handleDirectStatusChange("booking", detailModal.data!.id, "completed")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "booking",
+                          detailModal.data!.id,
+                          (detailModal.data as Booking).name,
+                          "completed",
+                          "Completed"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "completed"
                           ? "bg-brand-green-950 text-white ring-2 ring-brand-green-400 shadow-md"
@@ -1778,7 +1993,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     </button>
 
                     <button
-                      onClick={() => handleDirectStatusChange("booking", detailModal.data!.id, "cancelled")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "booking",
+                          detailModal.data!.id,
+                          (detailModal.data as Booking).name,
+                          "cancelled",
+                          "Cancelled"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "cancelled"
                           ? "bg-red-700 text-white ring-2 ring-red-400 shadow-md"
@@ -1795,7 +2018,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 {detailModal.type === "pledge" && (
                   <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
                     <button
-                      onClick={() => handleDirectStatusChange("pledge", detailModal.data!.id, "received")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "pledge",
+                          detailModal.data!.id,
+                          (detailModal.data as DonationPledge).donorName,
+                          "received",
+                          "Received at Shelter"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "received"
                           ? "bg-green-700 text-white ring-2 ring-green-400 shadow-md"
@@ -1807,7 +2038,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     </button>
 
                     <button
-                      onClick={() => handleDirectStatusChange("pledge", detailModal.data!.id, "cancelled")}
+                      onClick={() =>
+                        requestStatusChange(
+                          "pledge",
+                          detailModal.data!.id,
+                          (detailModal.data as DonationPledge).donorName,
+                          "cancelled",
+                          "Cancelled"
+                        )
+                      }
                       className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                         detailModal.data.status === "cancelled"
                           ? "bg-red-700 text-white ring-2 ring-red-400 shadow-md"

@@ -16,6 +16,7 @@ import {
 import { Booking } from "../types";
 import { TIME_SLOTS, VISIT_TYPES, SELIHOM_INFO } from "../data";
 import { useLanguage } from "../context/LanguageContext";
+import { saveBooking } from "../utils/adminStorage";
 import { DotGridPattern } from "./Sketches";
 
 export default function BookingSection() {
@@ -93,17 +94,7 @@ export default function BookingSection() {
         createdAt: new Date().toLocaleDateString(),
       };
 
-      const existingSaved = localStorage.getItem("selihom_bookings");
-      let currentList: Booking[] = [];
-      if (existingSaved) {
-        try {
-          currentList = JSON.parse(existingSaved);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-      const updated = [newBooking, ...currentList];
-      localStorage.setItem("selihom_bookings", JSON.stringify(updated));
+      saveBooking(newBooking);
       
       setSubmittedBooking(newBooking);
       setIsSubmitting(false);
@@ -359,88 +350,232 @@ export default function BookingSection() {
 
                   <form onSubmit={handleBookingSubmit} className="space-y-4">
                     {errorMessage && (
-                      <div className="bg-red-50 border border-red-100 text-red-700 p-3 rounded-xl text-xs font-semibold">
-                        {errorMessage}
+                      <div className="bg-red-50 border border-red-100 text-red-700 p-3 rounded-xl text-xs font-semibold flex items-center gap-2">
+                        <Info className="w-4 h-4 shrink-0 text-red-600" />
+                        <span>{errorMessage}</span>
                       </div>
                     )}
 
+                    {/* Visit Type Segmented Control */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-2">
-                        {language === "am" ? "የጉብኝት ቀን ይምረጡ" : "Choose Visit Date"}
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                        {language === "am" ? "የጉብኝት አይነት" : "Visit Category"}
                       </label>
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {datesList.map((d) => (
-                          <button
-                            key={d.dateString}
-                            type="button"
-                            onClick={() => setSelectedDate(d.dateString)}
-                            className={`min-w-[48px] h-12 rounded-xl border flex flex-col items-center justify-center cursor-pointer ${
-                              selectedDate === d.dateString
-                                ? "bg-brand-green-600 text-white font-bold border-brand-green-700"
-                                : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                            }`}
-                          >
-                            <span className="text-[8px] uppercase">{d.displayDay}</span>
-                            <span className="text-xs font-bold">{d.displayNum}</span>
-                          </button>
-                        ))}
+                      <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedType("individual"); setVisitorCount(1); }}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            selectedType === "individual"
+                              ? "bg-white text-brand-green-950 shadow-xs border border-gray-200 font-extrabold"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          <User className="w-3.5 h-3.5 text-brand-green-700" />
+                          <span>{language === "am" ? "የግል / ቤተሰብ" : "Individual / Family"}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedType("corporate"); if (visitorCount < 2) setVisitorCount(5); }}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                            selectedType === "corporate"
+                              ? "bg-white text-brand-green-950 shadow-xs border border-gray-200 font-extrabold"
+                              : "text-gray-600 hover:text-gray-900"
+                          }`}
+                        >
+                          <Users className="w-3.5 h-3.5 text-brand-green-700" />
+                          <span>{language === "am" ? "የድርጅት / የቡድን" : "Group / Corporate"}</span>
+                        </button>
                       </div>
                     </div>
 
+                    {/* Date Picker Section with Quick Date Chips & Native Date Input */}
                     <div>
-                      <label className="block text-xs font-bold text-gray-600 mb-2">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider">
+                          {language === "am" ? "የጉብኝት ቀን ይምረጡ" : "Select Tour Date"}
+                        </label>
+                        {selectedDate && (
+                          <span className="text-[10px] font-bold text-brand-green-800 bg-brand-green-50 px-2 py-0.5 rounded border border-brand-green-200">
+                            {selectedDate}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {/* Quick Date Chips */}
+                        <div className="flex gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin">
+                          {datesList.map((d, index) => (
+                            <button
+                              key={d.dateString}
+                              type="button"
+                              onClick={() => setSelectedDate(d.dateString)}
+                              className={`min-w-[62px] py-2 px-2 rounded-xl border flex flex-col items-center justify-center cursor-pointer transition-all shrink-0 ${
+                                selectedDate === d.dateString
+                                  ? "bg-brand-green-600 text-white font-extrabold border-brand-green-700 shadow-sm scale-102"
+                                  : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                              }`}
+                            >
+                              <span className="text-[9px] uppercase font-bold tracking-wider opacity-90">
+                                {index === 0 ? (language === "am" ? "ነገ" : "Tomorrow") : d.displayDay}
+                              </span>
+                              <span className="text-sm font-black">{d.displayNum}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Custom Date Input Fallback */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <span className="text-[10px] text-gray-500 font-medium">
+                            {language === "am" ? "ወይም የተለየ ቀን ይምረጡ፦" : "Or pick specific calendar date:"}
+                          </span>
+                          <input
+                            type="date"
+                            onChange={(e) => {
+                              if (!e.target.value) return;
+                              const picked = new Date(e.target.value + "T00:00:00");
+                              const formatted = picked.toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              });
+                              setSelectedDate(formatted);
+                            }}
+                            className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1 text-gray-800 cursor-pointer focus:bg-white focus:border-brand-green-600 outline-none font-bold"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Time Slot Selection */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                         {language === "am" ? "የጉብኝት ሰዓት ይምረጡ" : "Choose Time Slot"}
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {TIME_SLOTS.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            onClick={() => setSelectedSlot(slot)}
-                            className={`py-2 px-3 rounded-xl border text-xs cursor-pointer ${
-                              selectedSlot === slot
-                                ? "border-brand-green-600 bg-brand-green-50 text-brand-green-700 font-bold"
-                                : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
-                            }`}
-                          >
-                            {slot.split(" - ")[0]}
-                          </button>
-                        ))}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {TIME_SLOTS.map((slot) => {
+                          const isSelected = selectedSlot === slot;
+                          const isMorning = slot.includes("AM");
+                          return (
+                            <button
+                              key={slot}
+                              type="button"
+                              onClick={() => setSelectedSlot(slot)}
+                              className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                                isSelected
+                                  ? "border-brand-green-600 bg-brand-green-50 text-brand-green-950 font-extrabold shadow-xs ring-1 ring-brand-green-500"
+                                  : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Clock className={`w-4 h-4 shrink-0 ${isSelected ? "text-brand-green-700" : "text-gray-400"}`} />
+                                <span className="text-xs font-bold">{slot}</span>
+                              </div>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                isMorning ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-900"
+                              }`}>
+                                {isMorning ? "Morning" : "Afternoon"}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    <div className="space-y-3 pt-2">
+                    {/* Visitor Count for Corporate/Group */}
+                    {selectedType === "corporate" && (
+                      <div className="bg-brand-green-50/50 p-3 rounded-xl border border-brand-green-100 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-brand-green-950 block">
+                            {language === "am" ? "የጎብኝዎች ብዛት" : "Number of Visitors in Group"}
+                          </span>
+                          <span className="text-[10px] text-gray-500">
+                            {language === "am" ? "እስከ 30 ሰዎች መመደብ ይቻላል" : "Up to 30 people per group slot"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-1">
+                          <button
+                            type="button"
+                            onClick={() => setVisitorCount(Math.max(2, visitorCount - 1))}
+                            className="w-6 h-6 rounded bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center cursor-pointer text-xs"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-extrabold text-brand-green-950 min-w-[20px] text-center">
+                            {visitorCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setVisitorCount(Math.min(30, visitorCount + 1))}
+                            className="w-6 h-6 rounded bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 flex items-center justify-center cursor-pointer text-xs"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Contact Information Fields */}
+                    <div className="space-y-2.5 pt-1">
+                      <div>
+                        <input
+                          type="text"
+                          required
+                          placeholder={language === "am" ? "ሙሉ ስም *" : "Full Name *"}
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none font-medium"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="tel"
+                          required
+                          placeholder={language === "am" ? "ስልክ ቁጥር *" : "Phone Number *"}
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none font-medium"
+                        />
+                        <input
+                          type="email"
+                          placeholder={language === "am" ? "ኢሜይል (አማራጭ)" : "Email (Optional)"}
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none font-medium"
+                        />
+                      </div>
                       <input
                         type="text"
-                        required
-                        placeholder={language === "am" ? "ሙሉ ስም" : "Full Name"}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none"
-                      />
-                      <input
-                        type="tel"
-                        required
-                        placeholder={language === "am" ? "ስልክ ቁጥር" : "Phone Number"}
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none"
-                      />
-                      <input
-                        type="email"
-                        placeholder={language === "am" ? "ኢሜይል (አማራጭ)" : "Email (Optional)"}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none"
+                        placeholder={language === "am" ? "ለማስተባበሪያ ማስታወሻ (ለምሳሌ፡ ቁሳቁስ ልገሳ) - አማራጭ" : "Notes / Special Request (Optional)"}
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs text-brand-green-950 focus:bg-white focus:border-brand-green-600 outline-none font-medium"
                       />
                     </div>
+
+                    {/* Schedule Live Preview Summary */}
+                    {selectedDate && selectedSlot && (
+                      <div className="bg-emerald-50/80 p-3 rounded-xl border border-emerald-200 text-xs space-y-1">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900 block">
+                          {language === "am" ? "የተመረጠው የጉብኝት ማጠቃለያ" : "Tour Request Summary"}
+                        </span>
+                        <p className="text-brand-green-950 font-extrabold flex items-center gap-1.5">
+                          <CalendarIcon className="w-3.5 h-3.5 text-brand-green-700" />
+                          <span>{selectedDate} • {selectedSlot}</span>
+                        </p>
+                        <p className="text-gray-600 text-[11px] font-medium">
+                          {selectedType === "corporate" ? `Group Visit (${visitorCount} visitors)` : "Individual / Family Visit"}
+                        </p>
+                      </div>
+                    )}
 
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full py-3 bg-brand-green-600 hover:bg-brand-green-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-sm transition-all"
+                      className="w-full py-3.5 bg-brand-green-600 hover:bg-brand-green-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
                     >
-                      {isSubmitting ? "..." : (language === "am" ? "ጊዜውን መዝግብ" : "Submit Visit Request")}
+                      <CalendarIcon className="w-4 h-4" />
+                      {isSubmitting ? "Processing..." : (language === "am" ? "የጉብኝት ጊዜውን መዝግብ" : "Confirm & Submit Visit Request")}
                     </button>
                   </form>
                 </>

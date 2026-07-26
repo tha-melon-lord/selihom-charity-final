@@ -1,0 +1,123 @@
+{
+  "bookings": [
+    {
+      "id": "TKT-841920",
+      "name": "Dr. Samuel Tadesse",
+      "email": "samuel.tadesse@gmail.com",
+      "phone": "+251 911 234 567",
+      "date": "August 2, 2026",
+      "timeSlot": "09:00 AM - 11:30 AM",
+      "visitType": "corporate",
+      "visitorCount": 5,
+      "notes": "Group visit with medical supplies donation and shelter tour.",
+      "status": "approved",
+      "createdAt": "7/24/2026"
+    },
+    {
+      "id": "TKT-392019",
+      "name": "Bethlehem Worku",
+      "email": "bethlehem.w@yahoo.com",
+      "phone": "+251 922 876 543",
+      "date": "August 5, 2026",
+      "timeSlot": "02:00 PM - 04:30 PM",
+      "visitType": "individual",
+      "visitorCount": 2,
+      "notes": "Visiting senior care area and counseling program.",
+      "status": "pending",
+      "createdAt": "7/25/2026"
+    }
+  ],
+  "pledges": [
+    {
+      "id": "PLG-773109",
+      "donorName": "Kaleb Berhanu",
+      "donorEmail": "kaleb.berhanu@gmail.com",
+      "donorPhone": "+251 912 345 678",
+      "type": "inkind",
+      "pledgedItems": [
+        { "itemId": "food-rice", "name": "Rice (50kg bags)", "quantity": 3 },
+        { "itemId": "med-firstaid", "name": "First Aid & Hygiene Kits", "quantity": 10 }
+      ],
+      "date": "July 23, 2026",
+      "status": "pledged"
+    },
+    {
+      "id": "PLG-442918",
+      "donorName": "Helen Bekele",
+      "donorEmail": "helen.b@gmail.com",
+      "donorPhone": "+251 913 888 999",
+      "type": "inkind",
+      "pledgedItems": [
+        { "itemId": "edu-notebooks", "name": "Exercise Books & Pens Pack", "quantity": 25 }
+      ],
+      "date": "July 21, 2026",
+      "status": "received"
+    }
+  ],
+  "volunteers": [
+    {
+      "id": "VOL-102938",
+      "fullName": "Yonas Yilma",
+      "email": "yonas.yilma@gmail.com",
+      "phone": "+251 911 990 011",
+      "availability": "weekends",
+      "interestArea": "kitchen",
+      "experience": "Chef with 4 years experience in community kitchen meal preps.",
+      "status": "new",
+      "submittedAt": "7/25/2026"
+    },
+    {
+      "id": "VOL-554921",
+      "fullName": "Tigist Alemu",
+      "email": "tigist.alemu@health.gov.et",
+      "phone": "+251 914 223 344",
+      "availability": "flexible",
+      "interestArea": "medical",
+      "experience": "Registered psychiatric nurse interested in weekend consultations.",
+      "status": "accepted",
+      "submittedAt": "7/22/2026"
+    }
+  ],
+  "inKindNeeds": [
+    {
+      "id": "ik-1",
+      "name": { "am": "ጤፍና የእህል እቃዎች", "en": "Teff & Food Grains" },
+      "category": "Food",
+      "neededQuantity": { "am": "50 ጆንያ (100kg)", "en": "50 Sacks (100kg each)" },
+      "urgency": "High",
+      "description": { "am": "ለተጠቃሚዎች ዕለታዊ የምግብ ዝግጅት የሚሆን ጤፍና ጥራጥሬ", "en": "Essential food grain supply for daily community meal preps for shelter residents." }
+    },
+    {
+      "id": "ik-2",
+      "name": { "am": "የአዕምሮ ህክምና መድሃኒቶች", "en": "Psychiatric & Medical Supplies" },
+      "category": "Medical",
+      "neededQuantity": { "am": "የ2 ወር መድሃኒት አቅርቦት", "en": "2 Months Medicine Supply" },
+      "urgency": "High",
+      "description": { "am": "በማዕከሉ ውስጥ ለሚገኙ ታካሚዎች የታዘዙ መድሃኒቶችና የመጀመሪያ ህክምና ቁሳቁሶች", "en": "Prescribed psychiatric medication and basic first aid materials for patients in recovery." }
+    },
+    {
+      "id": "ik-3",
+      "name": { "am": "የንፅህና መጠበቂያ ቁሳቁሶች", "en": "Personal Hygiene Kits & Soap" },
+      "category": "Hygiene",
+      "neededQuantity": { "am": "100 ፓኬጅ", "en": "100 Individual Packs" },
+      "urgency": "Medium",
+      "description": { "am": "ሳሙና፣ የጥርስ ብሩሽ፣ ሻምፖ እና የሴቶች ንፅህና መጠበቂያዎች", "en": "Body soap, toothbrushes, laundry detergent, and sanitary products for residents." }
+    },
+    {
+      "id": "ik-4",
+      "name": { "am": "የብርድ ልብስና አልጋ ልብስ", "en": "Warm Blankets & Bedding Sets" },
+      "category": "Clothing",
+      "neededQuantity": { "am": "30 ጥንድ", "en": "30 Sets" },
+      "urgency": "Medium",
+      "description": { "am": "ለአዲስ ገቢዎችና አዛውንቶች የሚሆኑ አዲስ ወይም ንጹህ ብርድ ልብሶች", "en": "Warm heavy blankets and clean bedsheets for new arrivals and elderly shelter residents." }
+    }
+  ],
+  "adminProfile": {
+    "name": "Shelter Operations Admin",
+    "email": "admin@selihom.org",
+    "role": "Lead Administrator",
+    "phone": "+251 911 000 111",
+    "username": "admin",
+    "passwordHash": "selihom2026"
+  }
+}
